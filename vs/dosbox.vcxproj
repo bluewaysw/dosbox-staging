@@ -196,8 +196,8 @@ IF %ERRORLEVEL% LSS 8 SET ERRORLEVEL = 0</Command>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\include;..\src\libs;..\src\libs\ghc;..\src\libs\PDCurses;..\src\libs\loguru;..\src\libs\whereami;..\src\platform\visualc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>..\include;..\src\libs\ghc;..\src\libs\PDCurses;..\src\libs\loguru;..\src\libs\whereami;..\src\platform\visualc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions);TLS_AMALGAMATION</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <RuntimeTypeInfo>true</RuntimeTypeInfo>
@@ -467,6 +467,8 @@ IF %ERRORLEVEL% LSS 8 SET ERRORLEVEL = 0</Command>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\src\dosbox.cpp" />
+    <ClCompile Include="..\src\geos\geoshost.cpp" />
+    <ClCompile Include="..\src\geos\tlse.c" />
     <ClCompile Include="..\src\libs\PDCurses\pdcurses\addch.c" />
     <ClCompile Include="..\src\libs\PDCurses\pdcurses\addchstr.c" />
     <ClCompile Include="..\src\libs\PDCurses\pdcurses\addstr.c" />
@@ -863,6 +865,8 @@ IF %ERRORLEVEL% LSS 8 SET ERRORLEVEL = 0</Command>
     <ClInclude Include="..\src\dos\program_serial.h" />
     <ClInclude Include="..\src\fpu\fpu_instructions.h" />
     <ClInclude Include="..\src\fpu\fpu_instructions_x86.h" />
+    <ClInclude Include="..\src\geos\tlse.h" />
+    <ClInclude Include="..\src\geos\tls_root_ca.h" />
     <ClInclude Include="..\src\gui\gui_msgs.h" />
     <ClInclude Include="..\src\gui\render_scalers.h" />
     <ClInclude Include="..\src\gui\render_templates.h" />
@@ -955,6 +959,10 @@ IF %ERRORLEVEL% LSS 8 SET ERRORLEVEL = 0</Command>
   </ItemGroup>
   <ItemGroup>
     <Image Include="..\src\dosbox.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\src\geos\libtomcrypt.h" />
+    <None Include="..\src\geos\root.pem" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

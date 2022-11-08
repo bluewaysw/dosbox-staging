@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="..\src\capture\capture.cpp">
@@ -639,6 +639,12 @@
     </ClCompile>
     <ClCompile Include="..\src\misc\pacer.cpp">
       <Filter>src\misc</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\geos\geoshost.cpp">
+      <Filter>src\geos</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\geos\tlse.c">
+      <Filter>src\geos</Filter>
     </ClCompile>
     <ClCompile Include="..\src\dos\program_biostest.cpp">
       <Filter>src\dos</Filter>
@@ -1395,6 +1401,12 @@
     <ClInclude Include="..\src\libs\residfp\WaveformGenerator.h">
       <Filter>src\libs\residfp</Filter>
     </ClInclude>
+    <ClInclude Include="..\src\geos\tls_root_ca.h">
+      <Filter>src\geos</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\geos\tlse.h">
+      <Filter>src\geos</Filter>
+    </ClInclude>
     <ClInclude Include="..\src\libs\tal-chorus\Chorus.h">
       <Filter>src\libs\tal-chorus</Filter>
     </ClInclude>
@@ -1558,6 +1570,9 @@
     <Filter Include="src\libs\residfp">
       <UniqueIdentifier>{e8ef008d-ceb9-4224-9b9e-b5b62933ca0d}</UniqueIdentifier>
     </Filter>
+    <Filter Include="src\geos">
+      <UniqueIdentifier>{572a8fb3-1626-4935-9c09-c3bc9c1dc576}</UniqueIdentifier>
+    </Filter>
     <Filter Include="src\libs\tal-chorus">
       <UniqueIdentifier>{033fc91c-5316-48fd-a3f8-0d7a1b0839ae}</UniqueIdentifier>
     </Filter>
@@ -1585,5 +1600,13 @@
     <Filter Include="src\libs\zmbv">
       <UniqueIdentifier>{99b19861-c042-4e3e-bf24-ee8a418866f6}</UniqueIdentifier>
     </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\src\geos\root.pem">
+      <Filter>src\geos</Filter>
+    </None>
+    <None Include="..\src\geos\libtomcrypt.h">
+      <Filter>src\geos</Filter>
+    </None>
   </ItemGroup>
 </Project>

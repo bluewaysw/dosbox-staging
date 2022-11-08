@@ -60,6 +60,9 @@
 #include "video.h"
 
 bool shutdown_requested = false;
+#ifdef C_GEOSHOST
+void GeosHost_Init(Section *sec);
+#endif
 MachineType machine;
 SVGACards svgaCard;
 
@@ -1218,6 +1221,9 @@ void DOSBOX_Init()
 	pbool->Set_help("Enable IPX over UDP/IP emulation (disabled by default).");
 #endif
 
+#ifdef C_GEOSHOST
+	secprop = control->AddSection_prop("geoshost", &GeosHost_Init, true);
+#endif
 #if C_SLIRP
 	secprop = control->AddSection_prop("ethernet", &NE2K_Init, changeable_at_runtime);
 
