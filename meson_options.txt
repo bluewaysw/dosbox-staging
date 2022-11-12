@@ -124,6 +124,7 @@ option(
         'speexdsp',
         'tracy',
         'zlib',
+        'intl',
     ],
     value: [],
     description: 'Attempt to statically link selected libraries.',
