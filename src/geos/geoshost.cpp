@@ -49,12 +49,14 @@ static SocketState NetSockets[MaxSockets];
 static Bitu call_geoshost;
 static bool G_callbackPending = false;
 static bool G_receiveCallbackInit = false;
-static Bit16u G_receiveCallbackSeg;
-static Bit16u G_receiveCallbackOff;
+static uint16_t G_receiveCallbackSeg;
+static uint16_t G_receiveCallbackOff;
 
 static RealPt G_retrievalCallback;
 static Bitu G_callRetrieval;
 static bool G_receiveCallActive = false;
+
+static bool SDLNetInited = false;
 
 enum GeosHostCommands {
 	GHC_CHECK = 1,
@@ -114,8 +116,8 @@ static void NetStartReceiver(int handle);
 
 static void NetSetReceiveHandle() {
 
-	Bit16u pseg = SegValue(es);
-	Bit16u pofs = reg_bx;
+	uint16_t pseg = SegValue(es);
+	uint16_t pofs = reg_bx;
 
 	if ((pseg == 0) && (pofs == 0)) {
 		G_receiveCallbackInit = false;
