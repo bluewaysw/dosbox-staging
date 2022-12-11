@@ -859,6 +859,7 @@
     <ClCompile Include="..\src\libs\PDCurses\pdcurses\window.c">
       <Filter>src\libs\pdcurses</Filter>
     </ClCompile>
+<<<<<<< HEAD
     <ClCompile Include="..\src\libs\zmbv\drvproc.cpp">
       <Filter>src\libs\zmbv</Filter>
     </ClCompile>
@@ -868,6 +869,11 @@
     <ClCompile Include="..\src\libs\zmbv\zmbv_vfw.cpp">
       <Filter>src\libs\zmbv</Filter>
     </ClCompile>
+=======
+    <ClCompile Include="..\src\libs\zmbv\drvproc.cpp" />
+    <ClCompile Include="..\src\libs\zmbv\zmbv.cpp" />
+    <ClCompile Include="..\src\libs\zmbv\zmbv_vfw.cpp" />
+>>>>>>> 7d690e2f2 (Fix some of the TLS build configurations for selected targets. #2)
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\include\audio_frame.h">
@@ -1459,9 +1465,14 @@
       <Filter>src\libs\stb_truetype</Filter>
     </ClInclude>
     <ClInclude Include="..\src\libs\zmbv\Resource.h" />
+<<<<<<< HEAD
     <ClInclude Include="..\src\libs\zmbv\zmbv.h">
       <Filter>src\libs\zmbv</Filter>
     </ClInclude>
+=======
+    <ClInclude Include="..\src\libs\zmbv\zmbv.h" />
+    <ClInclude Include="..\src\hardware\serialport\softmouse.h" />
+>>>>>>> 7d690e2f2 (Fix some of the TLS build configurations for selected targets. #2)
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\src\winres.rc">
