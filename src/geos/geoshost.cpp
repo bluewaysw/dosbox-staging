@@ -601,7 +601,7 @@ static void SSLNew() {
 
 	int method = 0; // client method
 
-	int handle = AllocHandle(tls_create_context(method, TLS_V12));
+	int handle = AllocHandle(tls_create_context(method, TLS_V13));
 
 	SSL_set_io(reinterpret_cast<struct TLSContext *>(handles[handle - 1]),
 	           SSLSocketRecv,
@@ -630,7 +630,7 @@ static void	SSLSetFD() {
 	int socket = (reg_di & 0xFFFF) /* | (reg_dx << 16) */;
 	LOG_MSG("!!!SSLSetFD3 %x", socket);
 
-	int result = SSL_set_fd2(ctx, socket);
+	int result = SSL_set_fd(ctx, socket);
 
 	reg_ax = result & 0xFFFF;
 	reg_dx = (result >> 16) & 0xFFFF;
@@ -645,7 +645,7 @@ static void SSLConnect() {
 	struct TLSContext *ctx = reinterpret_cast<struct TLSContext *>(
 	        handles[context - 1]);
 
-	int result = SSL_connect2(ctx);
+	int result = SSL_connect(ctx);
 
 	reg_ax = result & 0xFFFF;
 	reg_dx = (result >> 16) & 0xFFFF;
@@ -653,9 +653,37 @@ static void SSLConnect() {
 
 static void SSLShutdown() {
 	LOG_MSG("!!!SSLShutdown");
+
+	int context = reg_si | (reg_bx << 16);
+	LOG_MSG("!!!SSLShutdown %x", context);
+
+	struct TLSContext *ctx = reinterpret_cast<struct TLSContext *>(
+	        handles[context - 1]);
+
+	int result = SSL_shutdown(ctx);
+
+	reg_ax = result & 0xFFFF;
+	reg_dx = (result >> 16) & 0xFFFF;
 }
 
-static void SSLRead() {
+static void SSLFree()
+{
+	LOG_MSG("!!!SSLFree");
+
+	int context = reg_si | (reg_bx << 16);
+	LOG_MSG("!!!SSLFree %x", context);
+
+	struct TLSContext *ctx = reinterpret_cast<struct TLSContext *>(
+	        handles[context - 1]);
+
+	SSL_free(ctx);
+
+	handles[context - 1] = NULL;
+}
+
+
+static void SSLRead()
+{
 	LOG_MSG("!!!SSLRead");
 
 	int context = reg_si | (reg_bx << 16);
@@ -671,7 +699,7 @@ static void SSLRead() {
 
 	char *buffer = new char[size + 1];
 
-	int result = SSL_read2(ctx, buffer, size);
+	int result = SSL_read(ctx, buffer, size);
 	if (result > 0) {
 		for (int i2 = 0; i2 < result; i2++) {
 			mem_writeb(dosBuff + i2, buffer[i2]);
@@ -707,7 +735,7 @@ static void SSLWrite() {
 	buffer[size] = 0;
 	LOG_MSG("Sending %d bytes: %s\n", size, buffer);
 
-	int sent = SSL_write2(ctx, buffer, size);
+	int sent = SSL_write(ctx, buffer, size);
 
 	if (sent < size) {
 		LOG_MSG("NetSendData send failed: %d", sent);
@@ -822,7 +850,10 @@ static Bitu INTB0_Handler(void) {
 	
 		SSLShutdown();
 	} 
-	else if (reg_ax == GHC_SSL_SSL_READ) {
+	else if (reg_ax == GHC_SSL_SSL_FREE) {
+	
+		SSLFree();
+	} else if (reg_ax == GHC_SSL_SSL_READ) {
 	
 		SSLRead();
 	} 

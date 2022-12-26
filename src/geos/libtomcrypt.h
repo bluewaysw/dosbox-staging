@@ -18855,7 +18855,7 @@ int der_decode_printable_string(const unsigned char *in, unsigned long inlen,
    @param inlen    The size of the input
    @param list     The list of items to decode
    @param outlen   The number of items in the list
-   @param ordered  Search an unordeded or ordered list
+   @param ordered  Search an unordered or ordered list
    @return CRYPT_OK on success
  */
 int der_decode_sequence_ex(const unsigned char *in, unsigned long inlen,
@@ -22807,7 +22807,7 @@ void der_sequence_free(ltc_asn1_list *in) {
 
         /* move to next and free current */
         l = in->next;
-        free(in);
+        XFREE(in);
         in = l;
     }
 }
