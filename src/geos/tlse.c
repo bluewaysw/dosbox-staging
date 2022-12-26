@@ -8261,6 +8261,64 @@ int SSL_set_io(struct TLSContext *context, void *recv_cb, void *send_cb)
 	return 0;
 }
 
+int SSL_write2(struct TLSContext *context, void *buf, unsigned int len)
+{
+	if (!context)
+		return TLS_GENERIC_ERROR;
+	SSLUserData *ssl_data = (SSLUserData *)context->user_data;
+	if ((!ssl_data) || (ssl_data->fd <= 0))
+		return TLS_GENERIC_ERROR;
+
+	int written_size = tls_write(context, (unsigned char *)buf, len);
+	if (written_size > 0) {
+		int res = __tls_ssl_private_send_pending(ssl_data->fd, context);
+		if (res <= 0)
+			return res;
+	}
+	return written_size;
+}
+
+int SSL_read2(struct TLSContext *context, void *buf, unsigned int len)
+{
+	if (!context)
+		return TLS_GENERIC_ERROR;
+
+	if (context->application_buffer_len)
+		return tls_read(context, (unsigned char *)buf, len);
+
+	SSLUserData *ssl_data = (SSLUserData *)context->user_data;
+	if ((!ssl_data) || (ssl_data->fd <= 0) || (context->critical_error))
+		return TLS_GENERIC_ERROR;
+	if (tls_established(context) != 1)
+		return TLS_GENERIC_ERROR;
+
+	if (!context->application_buffer_len) {
+		unsigned char client_message[0xFFFF];
+		// accept
+		int read_size;
+		while ((read_size = __private_tls_safe_read(context,
+		                                            (char *)client_message,
+		                                            sizeof(client_message))) >
+		       0) {
+			if (tls_consume_stream(context,
+			                       client_message,
+			                       read_size,
+			                       ssl_data->certificate_verify) > 0) {
+				__tls_ssl_private_send_pending(ssl_data->fd, context);
+				break;
+			}
+			if ((context->critical_error) &&
+			    (!context->application_buffer_len)) {
+				return TLS_GENERIC_ERROR;
+			}
+		}
+		if ((read_size <= 0) && (!context->application_buffer_len))
+			return read_size;
+	}
+
+	return tls_read(context, (unsigned char *)buf, len);
+}
+
 #ifdef SSL_COMPATIBLE_INTERFACE
 
 int  SSL_library_init() {

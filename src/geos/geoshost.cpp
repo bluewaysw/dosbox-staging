@@ -37,8 +37,18 @@ struct SocketState {
 	int recvBufUsed;
 	bool receiveDone;
 	bool done;
+	bool ssl;
+	bool sslInitialEnd;
 
-	SocketState() : used(false), recvBuf(NULL),recvBufUsed(0), receiveDone(false), done(false) {}
+	SocketState()
+	        : used(false),
+	          recvBuf(NULL),
+	          recvBufUsed(0),
+	          receiveDone(false),
+	          done(false),
+	          ssl(false),
+	          sslInitialEnd(false)
+	{}
 };
 
 static const int MaxSockets = 256;
@@ -181,12 +191,14 @@ static void NetResolveAddr() {
 		reg_dx = (ipaddress.host >> 16) & 0xFFFF;
 		reg_ax = ipaddress.host & 0xFFFF;
 		reg_flags &= ~FLAG_CF;
+		reg_bx = 0;
 
 		LOG_MSG("NetResolveAddr success %x", ipaddress.host);
 		return;
 	}
 
 	reg_flags |= FLAG_CF;
+	reg_bx = 1;
 }
 
 static void NetAllocConnection() {
@@ -278,6 +290,14 @@ static int ReceiveThread(void* sockPtr)
 	SocketState* sock = (SocketState*)sockPtr;
 	do {
 		// wait for data buffer to be supplied by dos request, or cancelled
+		if (((SocketState *)sock)->ssl) 
+		{
+			((SocketState *)sock)->receiveDone = true;
+			((SocketState *)sock)->sslInitialEnd = true;
+
+			 return 0;
+		}
+
 
 		if ((sock->recvBufUsed <= 0)
 			&& !G_receiveCallActive)
@@ -304,6 +324,7 @@ static int ReceiveThread(void* sockPtr)
 				LOG_MSG("\nReceived done");
 				SDL_Delay(5000);
 				((SocketState*)sock)->receiveDone = true;
+				((SocketState *)sock)->sslInitialEnd = true;
 				return 0;
 			}
 		}
@@ -513,6 +534,7 @@ static int AllocHandle(void* ptr) {
 			handles[handle] = ptr;
 			return handle + 1;
 		}
+		handle++;
 	}
 
 	return 0;
@@ -523,6 +545,16 @@ int SSLSocketRecv(int socket, void *buffer, size_t length, int flags)
 	LOG_MSG("!!!SSLSocketRecv");
 	SocketState &sock = NetSockets[socket];
 
+	while (!sock.sslInitialEnd) {
+	};
+
+	if (sock.recvBufUsed) {
+		int recvSize = sock.recvBufUsed;
+		memcpy(buffer, sock.recvBuf, recvSize);
+		sock.recvBufUsed = 0;
+		return recvSize;
+	}
+
 	return SDLNet_TCP_Recv(sock.socket, buffer, length);
 }
 
@@ -530,6 +562,8 @@ int SSLSocketSend(int socket, const void *buffer, size_t length, int flags)
 {
 	LOG_MSG("!!!SSLSocketSend");
 	SocketState &sock = NetSockets[socket];
+
+	sock.ssl = true;
 
 	return SDLNet_TCP_Send(sock.socket, buffer, length);
 }
@@ -564,6 +598,18 @@ static void SSLNew() {
 	void *result = reinterpret_cast<void *>(context);
 	reg_ax = reinterpret_cast<int>(result) & 0xFFFF;
 	reg_dx = (reinterpret_cast<int>(result) >> 16) & 0xFFFF;
+
+	int method = 0; // client method
+
+	int handle = AllocHandle(tls_create_context(method, TLS_V12));
+
+	SSL_set_io(reinterpret_cast<struct TLSContext *>(handles[handle - 1]),
+	           SSLSocketRecv,
+	           SSLSocketSend);
+
+	reg_ax = handle & 0xFFFF;
+	reg_dx = (handle >> 16) & 0xFFFF;
+
 	LOG_MSG("!!!SSLNew result %x", result);
 }
 
@@ -581,7 +627,7 @@ static void	SSLSetFD() {
 
 	struct TLSContext *ctx = reinterpret_cast<struct TLSContext *>(handles[context - 1]);
 
-	int socket = (reg_di & 0xFFFF) | (reg_dx << 16);
+	int socket = (reg_di & 0xFFFF) /* | (reg_dx << 16) */;
 	LOG_MSG("!!!SSLSetFD3 %x", socket);
 
 	int result = SSL_set_fd2(ctx, socket);
@@ -611,10 +657,72 @@ static void SSLShutdown() {
 
 static void SSLRead() {
 	LOG_MSG("!!!SSLRead");
+
+	int context = reg_si | (reg_bx << 16);
+	LOG_MSG("!!!SSLRead %x", context);
+
+	struct TLSContext *ctx = reinterpret_cast<struct TLSContext *>(
+	        handles[context - 1]);
+
+	// CX:DX = DOS addr of buffer
+	// DI size
+	PhysPt dosBuff = (reg_dx << 4) + reg_cx;
+	int size       = reg_di;
+
+	char *buffer = new char[size + 1];
+
+	int result = SSL_read2(ctx, buffer, size);
+	if (result > 0) {
+		for (int i2 = 0; i2 < result; i2++) {
+			mem_writeb(dosBuff + i2, buffer[i2]);
+		}
+	
+	}
+
+	delete[] buffer;
+
+	reg_ax = result & 0xFFFF;
+	reg_dx = (result >> 16) & 0xFFFF;
 }
 
 static void SSLWrite() {
 	LOG_MSG("!!!SSLWrite");
+
+	int context = reg_si | (reg_bx << 16);
+	LOG_MSG("!!!SSLWrite %x", context);
+
+	struct TLSContext *ctx = reinterpret_cast<struct TLSContext *>(
+	        handles[context - 1]);
+
+	// CX:DX = DOS addr of buffer
+	// DI size
+	PhysPt dosBuff = (reg_dx << 4) + reg_cx;
+	int size       = reg_di;
+	LOG_MSG("SSL write data size: %d", size);
+
+	char *buffer = new char[size + 1];
+	for (int i = 0; i < size; i++) {
+		buffer[i] = mem_readb(dosBuff + i);
+	}
+	buffer[size] = 0;
+	LOG_MSG("Sending %d bytes: %s\n", size, buffer);
+
+	int sent = SSL_write2(ctx, buffer, size);
+
+	if (sent < size) {
+		LOG_MSG("NetSendData send failed: %d", sent);
+	} else {
+		LOG_MSG("NetSendData send success");
+	}
+	reg_ax = 0;
+
+	delete[] buffer;
+
+
+	int result = sent;
+
+	reg_ax = result & 0xFFFF;
+	reg_dx = (result >> 16) & 0xFFFF;
 }
 
 

@@ -285,7 +285,9 @@ int tls_clear_certificates(struct TLSContext *context);
     int SSL_connect2(struct TLSContext *context);
     int SSL_shutdown(struct TLSContext *context);
     int SSL_write(struct TLSContext *context, void *buf, unsigned int len);
+    int SSL_write2(struct TLSContext *context, void *buf, unsigned int len);
     int SSL_read(struct TLSContext *context, void *buf, unsigned int len);
+    int SSL_read2(struct TLSContext *context, void *buf, unsigned int len);
     int SSL_pending(struct TLSContext *context);
     int SSL_set_io(struct TLSContext *context, void *recv, void *send);
 #endif
