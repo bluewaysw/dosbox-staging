@@ -577,7 +577,8 @@ static void SSLContextNew() {
 	int handle = AllocHandle(tls_create_context(method, TLS_V12));
 
 	SSL_set_io(reinterpret_cast<struct TLSContext *>(handles[handle - 1]),
-	           SSLSocketRecv, SSLSocketSend);
+	           (void*)SSLSocketRecv,
+	           (void *)SSLSocketSend);
 
 
 	reg_ax = handle & 0xFFFF;
@@ -604,8 +605,8 @@ static void SSLNew() {
 	int handle = AllocHandle(tls_create_context(method, TLS_V13));
 
 	SSL_set_io(reinterpret_cast<struct TLSContext *>(handles[handle - 1]),
-	           SSLSocketRecv,
-	           SSLSocketSend);
+	           (void *)SSLSocketRecv,
+	           (void *)SSLSocketSend);
 
 	reg_ax = handle & 0xFFFF;
 	reg_dx = (handle >> 16) & 0xFFFF;
