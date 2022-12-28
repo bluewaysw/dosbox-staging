@@ -259,7 +259,11 @@ if get_option('autovec_info')
     ]
 endif
 
-# Tag BSD executables with the WX-needed bit
+#extra_flags += [
+    '-DTLS_AMALGAMATION',
+]
+
+ Tag BSD executables with the WX-needed bit
 if os_family_name == 'BSD'
     extra_link_flags += ['-Wl,-z,wxneeded']
 endif
