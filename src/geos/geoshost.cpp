@@ -597,8 +597,8 @@ static void SSLNew() {
 	LOG_MSG("!!!SSLNew context %x", context);
 
 	void *result = reinterpret_cast<void *>(context);
-	reg_ax = reinterpret_cast<int>(result) & 0xFFFF;
-	reg_dx = (reinterpret_cast<int>(result) >> 16) & 0xFFFF;
+	reg_ax = context & 0xFFFF;
+	reg_dx = (context >> 16) & 0xFFFF;
 
 	int method = 0; // client method
 
