@@ -546,8 +546,10 @@ int SSLSocketRecv(int socket, void *buffer, size_t length, int flags)
 	LOG_MSG("!!!SSLSocketRecv");
 	SocketState &sock = NetSockets[socket];
 
+	LOG_MSG("\n!!!SSLSocketRecv start wait");
 	while (!sock.sslInitialEnd) {
 	};
+	LOG_MSG("\n!!!SSLSocketRecv done wait");
 
 	if (sock.recvBufUsed) {
 		int recvSize = sock.recvBufUsed;
