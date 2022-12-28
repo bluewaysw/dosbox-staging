@@ -419,6 +419,8 @@ conf_data.set_quoted(
 )
 
 conf_data.set10(os_family_name, true)
+conf_data.set10('C_GEOSHOST', 1)
+
 conf_data.set10('C_MODEM', get_option('use_sdl2_net'))
 conf_data.set10('C_IPX', get_option('use_sdl2_net'))
 conf_data.set10('C_SLIRP', get_option('use_slirp'))
