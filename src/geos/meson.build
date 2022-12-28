@@ -12,6 +12,6 @@ libgeos = static_library(
     ],
 )
 
-libdgeos_dep = declare_dependency(link_with: libgeos)
+libgeos_dep = declare_dependency(link_with: libgeos)
 
 internal_deps += libgeos_dep
