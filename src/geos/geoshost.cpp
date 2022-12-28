@@ -295,7 +295,7 @@ static int ReceiveThread(void* sockPtr)
 			((SocketState *)sock)->receiveDone = true;
 			((SocketState *)sock)->sslInitialEnd = true;
 
-			LOG_MSG("\nSSL initial receive done");
+			LOG_MSG("\nSSL initial receive done %x", sock);
 			return 0;
 		}
 
@@ -546,7 +546,7 @@ int SSLSocketRecv(int socket, void *buffer, size_t length, int flags)
 	LOG_MSG("!!!SSLSocketRecv");
 	SocketState &sock = NetSockets[socket];
 
-	LOG_MSG("\n!!!SSLSocketRecv start wait");
+	LOG_MSG("\n!!!SSLSocketRecv start wait %x", &sock);
 	while (!sock.sslInitialEnd) {
 	};
 	LOG_MSG("\n!!!SSLSocketRecv done wait");
