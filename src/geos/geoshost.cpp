@@ -295,7 +295,8 @@ static int ReceiveThread(void* sockPtr)
 			((SocketState *)sock)->receiveDone = true;
 			((SocketState *)sock)->sslInitialEnd = true;
 
-			 return 0;
+			LOG_MSG("\nSSL initial receive done");
+			return 0;
 		}
 
 
