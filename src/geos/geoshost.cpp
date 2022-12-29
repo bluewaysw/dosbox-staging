@@ -38,7 +38,7 @@ struct SocketState {
 	bool receiveDone;
 	bool done;
 	bool ssl;
-	bool sslInitialEnd;
+	volatile bool sslInitialEnd;
 
 	SocketState()
 	        : used(false),
