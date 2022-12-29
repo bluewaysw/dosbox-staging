@@ -28,16 +28,16 @@ extern "C" {
 }
 
 struct SocketState {
-	bool used;
-	bool open;
-	bool blocking;
+	volatile bool used;
+	volatile bool open;
+	volatile bool blocking;
 	TCPsocket socket;
 	SDLNet_SocketSet socketSet;
 	char* recvBuf;
-	int recvBufUsed;
-	bool receiveDone;
-	bool done;
-	bool ssl;
+	volatile int recvBufUsed;
+	volatile bool receiveDone;
+	volatile bool done;
+	volatile bool ssl;
 	volatile bool sslInitialEnd;
 
 	SocketState()
