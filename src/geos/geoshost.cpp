@@ -68,6 +68,9 @@ static bool G_receiveCallActive = false;
 
 static bool SDLNetInited = false;
 
+SDL_mutex *G_callbackMutex;
+
+
 enum GeosHostCommands {
 	GHC_CHECK = 1,
 	GHC_SET_RECEIVE_HANDLE = 2,
@@ -81,7 +84,8 @@ enum GeosHostCommands {
 	GHC_NC_RECV_NEXT = GHC_NETWORKING_BASE + 5,
 	GHC_NC_RECV_NEXT_CLOSED = GHC_NETWORKING_BASE + 6,
 	GHC_NC_CLOSE = GHC_NETWORKING_BASE + 7,
-	GHC_NETWORKING_END = 1199,
+	GHC_NC_DISCONNECT_REQUEST = GHC_NETWORKING_BASE + 8,
+	GHC_NETWORKING_END                = 1199,
 	GHC_SSL_BASE = 1200,
 	GHC_SSL_SSLV2_CLIENT_METHOD = GHC_SSL_BASE, 
 	GHC_SSL_SSLEAY_ADD_SSL_ALGORITHMS = GHC_SSL_BASE + 1, 
@@ -122,6 +126,104 @@ enum GeosHostError {
 };
 
 static void NetStartReceiver(int handle);
+
+
+class CallbackTask;
+
+CallbackTask *G_callbackTaskList = NULL;
+
+class CallbackTask {
+
+private:
+	int m_CallbackDataSegment;
+	int m_CallbackDataOffset;
+	int m_AX;
+	CallbackTask *m_NextTask;
+
+public:
+	CallbackTask(CallbackTask* next, int aCallbackDataSegment,
+	             int aCallbackDataOffset, int aAX)
+	{
+		m_CallbackDataSegment = aCallbackDataSegment;
+		m_CallbackDataOffset  = aCallbackDataOffset;
+		m_AX                  = aAX;
+		m_NextTask            = next;
+	}
+
+public:
+	CallbackTask* getNextTask() {
+		return m_NextTask;
+	}
+	int getCallbackDataSegment() {
+		return m_CallbackDataSegment;
+	}
+	int getCallbackDataOffset()
+	{
+		return m_CallbackDataOffset;
+	}
+	int getAX()
+	{
+		return m_AX;
+	}
+};
+
+
+static void CallbackAdd(int aCallbackDataSegment, int aCallbackDataOffset, int aAX)
+{
+	SDL_mutexP(G_callbackMutex);
+
+	G_callbackTaskList = new CallbackTask(G_callbackTaskList,
+	                 aCallbackDataSegment,
+	                 aCallbackDataOffset,
+	                 aAX);
+
+	SDL_mutexV(G_callbackMutex);
+}
+
+static void CallbackExec() {
+
+	SDL_mutexP(G_callbackMutex);
+
+	CallbackTask *oldTaskList = G_callbackTaskList;
+	G_callbackTaskList     = NULL;
+
+	SDL_mutexV(G_callbackMutex);
+	CallbackTask *nextTask = oldTaskList;
+
+	while (nextTask) {
+
+		// do this callback
+		// fetch callback fptr
+		uint16_t callbackSegment = real_readw(nextTask->getCallbackDataSegment(),
+		           nextTask->getCallbackDataOffset() + 2);
+		uint16_t callbackOffset =
+		        real_readw(nextTask->getCallbackDataSegment(),
+		                   nextTask->getCallbackDataOffset());
+
+		// setup ds and si
+		uint16_t old_ax = reg_ax;
+		uint16_t old_ds = SegValue(ds);
+		SegSet16(ds, nextTask->getCallbackDataSegment());
+		int old_si = reg_si;
+		reg_si = nextTask->getCallbackDataOffset();
+		reg_ax     = nextTask->getAX();
+
+		LOG_MSG("CALLBACK_RunRealFar(%x) %x %x:\n", SDL_ThreadID(), SegValue(ss), reg_sp);
+		uint16_t old_flags = reg_flags;
+		reg_flags &= ~FLAG_IF;
+		CALLBACK_RunRealFar(callbackSegment, callbackOffset);
+		reg_flags |= old_flags & FLAG_IF;
+
+		reg_si = old_si;
+		reg_ax = old_ax;
+		SegSet16(ds, old_ds);
+
+
+		nextTask = nextTask->getNextTask();
+	}
+
+	delete oldTaskList;
+}
 
 
 static void NetSetReceiveHandle() {
@@ -225,16 +327,122 @@ static void NetAllocConnection() {
 	SocketState &sock = NetSockets[socketHandle];
 
 	sock.used = true;
+	sock.done = false;
 	sock.open = false;
 	sock.blocking = false;
+	sock.ssl      = false;
+	sock.sslInitialEnd = false;
+	sock.receiveDone = false;
+
 
 	reg_ax = socketHandle;
 	reg_bx = 0;
 }
 
+
+class ConnectorParameter {
+	
+private:
+	int m_Handle;
+	IPaddress m_Address;
+	int m_CallbackDataSegment;
+	int m_CallbackDataOffset;
+
+public:
+	ConnectorParameter(int aHandle, IPaddress& aAddress, int aCallbackDataSegment, int aCallbackDataOffset) {
+		m_Handle = aHandle;
+		m_Address = aAddress;
+		m_CallbackDataSegment = aCallbackDataSegment;
+		m_CallbackDataOffset  = aCallbackDataOffset;
+	}
+
+public:
+	int getHandle() {
+		return m_Handle;
+	}
+	IPaddress& getAddress() {
+		return m_Address;
+	}
+	int getCallbackDataSegment() {
+		return m_CallbackDataSegment;
+	}
+	int getCallbackDataOffset()
+	{
+		return m_CallbackDataOffset;
+	}
+};
+
+static int ConnectThread(void *paramsPtr)
+{
+	ConnectorParameter *params = static_cast<ConnectorParameter *>(paramsPtr);
+	int socketHandle  = params->getHandle();
+	SocketState &sock = NetSockets[socketHandle];
+
+	int result = 0;
+
+	if (!(sock.socket = SDLNet_TCP_Open(&params->getAddress()))) {
+		//__android_log_print(ANDROID_LOG_DEBUG, "GeosHost", "TCP Open
+		// failed %x\n", ip.host); if (!sock.blocking) {
+		//	SDLNet_FreeSocketSet(sock.socketSet);
+		//}
+		LOG_MSG("NetConnectRequest failed");
+
+		result = 1;
+
+	} else {
+	
+		sock.open = true;
+		LOG_MSG("NetConnectRequest success");
+
+		// connected, for testing start receive thread now
+		NetStartReceiver(socketHandle);
+	}
+
+	// register callback 
+	CallbackAdd(params->getCallbackDataSegment(),
+	            params->getCallbackDataOffset(),
+				result
+	);
+
+	delete params;
+
+	return 0;
+}
+
+
+int NetStartConnector(int handle,IPaddress& ip, int dataSegment, int dataOffset) {
+
+	// start receiver thread
+	SDL_Thread *thread;
+	int threadReturnValue;
+
+	ConnectorParameter *params = new ConnectorParameter(
+	        handle, ip, dataSegment, dataOffset);
+
+
+	LOG_MSG("\nSimple SDL_CreateThread test:");
+
+	SocketState &sock = NetSockets[handle];
+
+	// Simply create a thread
+	thread = SDL_CreateThread(ConnectThread, "ConnectThread", (void *)params);
+
+	if (NULL == thread) {
+		LOG_MSG("\nSDL_CreateThread failed: %s\n", SDL_GetError());
+		delete params;
+	} else {
+		// SDL_WaitThread(thread, &threadReturnValue);
+		// printf("\nThread returned value: %d", threadReturnValue);
+	}
+
+	return 0;
+}
+
+
 // GHC_NC_CONNECT_REQUEST
 // Parameters:
 // al = GHC_NC_CONNECT_REQUEST
+// ss:bp - ptr to callback struct (GeosHostNetConnectCallbackData)
 // ds:si - ip addr to connect to
 // cx - interface
 // bx - socket handle
@@ -246,6 +454,7 @@ static void NetAllocConnection() {
 
 static void NetConnectRequest() {
 
+	// this becomes an async task
 	LOG_MSG("NetConnectRequest port: %u  sock: %u  addr: %u.%u.%u.%u", reg_dx, reg_bx,
 			reg_si & 0xFF,
 			(reg_si >> 8) & 0xFF,
@@ -259,28 +468,9 @@ static void NetConnectRequest() {
 
 	LOG_MSG("NetConnectRequest Socket handle: %d", reg_bx);
 
-	int socketHandle = reg_bx;
-	SocketState &sock = NetSockets[reg_bx];
+	int err = NetStartConnector(reg_bx, ip, SegValue(ss), reg_bp);
 
-	if (!(sock.socket = SDLNet_TCP_Open(&ip))) {
-		//__android_log_print(ANDROID_LOG_DEBUG, "GeosHost", "TCP Open failed %x\n", ip.host);
-		//if (!sock.blocking) {
-		//	SDLNet_FreeSocketSet(sock.socketSet);
-		//}
-		reg_ax = -3;
-		LOG_MSG("NetConnectRequest failed");
-		return;
-	}
-
-	//SDLNet_TCP_AddSocket(sock.socketSet, sock.socket);
-
-	//__android_log_print(ANDROID_LOG_DEBUG, "GeosHost", "Socket opened!\n");
-
-	sock.open = true;
-
-	// connected, for testing start receive thread now
-	NetStartReceiver(reg_bx);
-	//PIC_ActivateIRQ(5);
+	reg_ax = 0;
 }
 
 static int ReceiveThread(void* sockPtr)
@@ -307,17 +497,22 @@ static int ReceiveThread(void* sockPtr)
 			LOG_MSG("\nReceived get");
 			if (sock->recvBuf == NULL) {
 				LOG_MSG("\nReceived new buf");
-				sock->recvBuf = new char[512];
+				sock->recvBuf = new char[8192];
 			}
 
-			int result = SDLNet_TCP_Recv(((SocketState*)sock)->socket, sock->recvBuf, 512);
+			int result = SDLNet_TCP_Recv(((SocketState*)sock)->socket, sock->recvBuf, 8192);
 			LOG_MSG("\nReceived data %d", result);
 			if ((!sock->done) && (result > 0)) {
 
+
 				// pass data to DOS
 				sock->recvBufUsed = result;
+				
+				SDL_mutexP(G_callbackMutex);
 				G_callbackPending = true;
-				//PIC_ActivateIRQ(5);
+				SDL_mutexV(G_callbackMutex);
+				// PIC_ActivateIRQ(5);
+				LOG_MSG("\nReceived data passed");
 			}
 			else {
 
@@ -395,20 +590,19 @@ static void NetSendData() {
 		buffer[i] = mem_readb(dosBuff + i);
 	}
 	buffer[size] = 0;
-	LOG_MSG("Sending %d bytes: %s\n", size, buffer);
-
 
 	int sockhandle = reg_bx;
 	int sent = SDLNet_TCP_Send(sock.socket, buffer, size);
 	if (sent < size) {
 
 		LOG_MSG("NetSendData send failed: %d %d", sent, socketHandle);
+		reg_ax = 1;
 	}
 	else {
 
 		LOG_MSG("NetSendData send success");
+		reg_ax = 0;
 	}
-	reg_ax = 0;
 
 	delete[] buffer;
 }
@@ -450,6 +644,20 @@ static void NetClose() {
 		sock.done = true;
 		//SDLNet_TCP_Close(sock.socket);
 	}
+}
+
+static void NetDisconnect()
+{
+	LOG_MSG("NetDisconnect: %d %x %x", reg_bx, SegValue(ss), reg_bp);
+	SocketState &sock = NetSockets[reg_bx];
+
+	if (sock.used) {
+		sock.done = true;
+		SDLNet_TCP_Close(sock.socket);
+		sock.used = false;
+	}
+
+	CallbackAdd(SegValue(ss), reg_bp, 0);
 }
 
 
@@ -594,7 +802,7 @@ static void SSLContextFree() {
 }
 
 static void SSLNew() {
-	LOG_MSG("!!!SSLNew");
+	LOG_MSG("!!!SSLNew(%x)", SDL_ThreadID());
 
 	int context = reg_si | (reg_bx << 16);
 	LOG_MSG("!!!SSLNew context %x", context);
@@ -605,7 +813,7 @@ static void SSLNew() {
 
 	int method = 0; // client method
 
-	int handle = AllocHandle(tls_create_context(method, TLS_V13));
+	int handle = AllocHandle(tls_create_context(method, TLS_V12));
 
 	SSL_set_io(reinterpret_cast<struct TLSContext *>(handles[handle - 1]),
 	           (void *)SSLSocketRecv,
@@ -648,6 +856,8 @@ static void SSLConnect() {
 
 	struct TLSContext *ctx = reinterpret_cast<struct TLSContext *>(
 	        handles[context - 1]);
+
+	tls_sni_set(ctx, "www.geos-infobase.de");
 
 	int result = SSL_connect(ctx);
 
@@ -701,9 +911,12 @@ static void SSLRead()
 	PhysPt dosBuff = (reg_dx << 4) + reg_cx;
 	int size       = reg_di;
 
+	LOG_MSG("!!!SSLRead size %d", size);
+
 	char *buffer = new char[size + 1];
 
 	int result = SSL_read(ctx, buffer, size);
+	LOG_MSG("!!!SSLRead resuld %d", result);
 	if (result > 0) {
 		for (int i2 = 0; i2 < result; i2++) {
 			mem_writeb(dosBuff + i2, buffer[i2]);
@@ -737,7 +950,6 @@ static void SSLWrite() {
 		buffer[i] = mem_readb(dosBuff + i);
 	}
 	buffer[size] = 0;
-	LOG_MSG("Sending %d bytes: %s\n", size, buffer);
 
 	int sent = SSL_write(ctx, buffer, size);
 
@@ -822,6 +1034,10 @@ static Bitu INTB0_Handler(void) {
 
 		NetClose();
 	} 
+	else if (reg_ax == GHC_NC_DISCONNECT_REQUEST) {
+	
+		NetDisconnect();
+	}
 	else if (reg_ax == GHC_SSL_SSLV2_CLIENT_METHOD) {
 
 		SSLV2ClientMethod();
@@ -914,26 +1130,44 @@ static Bitu RetrievalCallback_Handler(void) {
 }
 
 
-static void CALLBACK_Poller(void) {
+static void CALLBACK_Poller(void)
+{
+	if (G_receiveCallbackInit && !G_receiveCallActive) {
 
-	if (G_callbackPending) {
+		SDL_mutexP(G_callbackMutex);
 
-		if (G_receiveCallbackInit && !G_receiveCallActive) {
+		bool wasPending = G_callbackPending;
+		G_callbackPending = false;
+
+		SDL_mutexV(G_callbackMutex);
+		
+		if (wasPending) {
 			LOG_MSG("CALLBACK_Poller");
 
 			G_receiveCallActive = true;
-			CALLBACK_RunRealFar(G_receiveCallbackSeg, G_receiveCallbackOff);
-			G_callbackPending = false;
+			LOG_MSG("CALLBACK_RunRealFar2 %x %x:\n", SegValue(ss), reg_sp);
+			uint16_t old_flags = reg_flags;
+			reg_flags &= ~FLAG_IF;
+
+			CALLBACK_RunRealFar(G_receiveCallbackSeg,
+			                    G_receiveCallbackOff);
+			reg_flags |= old_flags & FLAG_IF;
 			G_receiveCallActive = false;
 			LOG_MSG("CALLBACK_Poller2");
 		}
 	}
+	if (!G_receiveCallActive) {
+		G_receiveCallActive = true;
+		CallbackExec();
+		G_receiveCallActive = false;
+	}
 }
-
 
 void GeosHost_Init(Section* /*sec*/) {
 
 	memset(NetSockets, 0, sizeof(SocketState)*MaxSockets);
+
+	G_callbackMutex = SDL_CreateMutex();
 
 	G_callRetrieval = CALLBACK_Allocate();
 	CALLBACK_Setup(G_callRetrieval, &RetrievalCallback_Handler, CB_RETF, "retrieval callback");

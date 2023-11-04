@@ -1,5 +1,5 @@
 /********************************************************************************
- Copyright (c) 2016-2021, Eduard Suica
+ Copyright (c) 2016-2023, Eduard Suica
  All rights reserved.
  
  Redistribution and use in source and binary forms, with or without modification,
@@ -7425,7 +7425,7 @@ int tls_parse_verify_tls13(struct TLSContext *context, const unsigned char *buf,
     unsigned short signature = ntohs(*(unsigned short *)&buf[3]);
     unsigned short signature_size = ntohs(*(unsigned short *)&buf[5]);
     int valid = 0;
-    CHECK_SIZE(7 + size, buf_len, TLS_NEED_MORE_DATA)
+    CHECK_SIZE(7 + signature_size, buf_len, TLS_NEED_MORE_DATA)
     switch (signature) {
 #ifdef TLS_ECDSA_SUPPORTED
         case 0x0403:
