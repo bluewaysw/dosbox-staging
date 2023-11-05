@@ -231,6 +231,8 @@ static void NetSetReceiveHandle() {
 	uint16_t pseg = SegValue(es);
 	uint16_t pofs = reg_bx;
 
+	LOG_MSG("NetSetReceiveHandle %x %x:\n", pseg, pofs);
+
 	if ((pseg == 0) && (pofs == 0)) {
 		G_receiveCallbackInit = false;
 	}
@@ -377,6 +379,10 @@ static int ConnectThread(void *paramsPtr)
 	ConnectorParameter *params = static_cast<ConnectorParameter *>(paramsPtr);
 	int socketHandle  = params->getHandle();
 	SocketState &sock = NetSockets[socketHandle];
+
+	LOG_MSG("ConnectThread started %x %x",
+	        params->getAddress().host,
+	        params->getAddress().port);
 
 	int result = 0;
 
