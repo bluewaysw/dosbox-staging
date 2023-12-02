@@ -897,7 +897,7 @@ static void SSLSetTLSExtHostName() {
 
 	struct TLSContext *ctx = reinterpret_cast<struct TLSContext *>(
 	        handles[context - 1]);
-
+	 
 	// TODO check buffer size
 	PhysPt dosBuff = (reg_dx << 4) + reg_cx;
 	MEM_StrCopy(dosBuff, host, reg_di); // 1024 toasts the
