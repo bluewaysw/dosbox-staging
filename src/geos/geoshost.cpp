@@ -101,7 +101,8 @@ enum GeosHostCommands {
 	GHC_SSL_SSLV23_CLIENT_METHOD = GHC_SSL_BASE + 11, 
 	GHC_SSL_SSLV3_CLIENT_METHOD = GHC_SSL_BASE + 12, 
 	GHC_SSL_SSL_GET_SSL_METHOD = GHC_SSL_BASE + 13,
-	GHC_SSL_SET_CALLBACK = GHC_SSL_BASE + 14
+	GHC_SSL_SET_CALLBACK = GHC_SSL_BASE + 14,
+	GHC_SSL_SET_TLSEXT_HOST_NAME = GHC_SSL_BASE + 15
 };
 
 enum NetworkingCommands {
@@ -137,17 +138,19 @@ class CallbackTask {
 private:
 	int m_CallbackDataSegment;
 	int m_CallbackDataOffset;
+	int m_StackPointer;
 	int m_AX;
 	CallbackTask *m_NextTask;
 
 public:
 	CallbackTask(CallbackTask* next, int aCallbackDataSegment,
-	             int aCallbackDataOffset, int aAX)
+	             int aCallbackDataOffset, int aAX, int aStackPointer)
 	{
 		m_CallbackDataSegment = aCallbackDataSegment;
 		m_CallbackDataOffset  = aCallbackDataOffset;
 		m_AX                  = aAX;
 		m_NextTask            = next;
+		m_StackPointer        = aStackPointer;
 	}
 
 public:
@@ -165,22 +168,31 @@ public:
 	{
 		return m_AX;
 	}
+	int getStackPointer()
+	{
+		return m_StackPointer;
+	}
 };
 
 
-static void CallbackAdd(int aCallbackDataSegment, int aCallbackDataOffset, int aAX)
+static void CallbackAdd(int aCallbackDataSegment, int aCallbackDataOffset, int aAX, int aStackPointer)
 {
 	SDL_mutexP(G_callbackMutex);
 
 	G_callbackTaskList = new CallbackTask(G_callbackTaskList,
 	                 aCallbackDataSegment,
 	                 aCallbackDataOffset,
-	                 aAX);
+	                 aAX,
+					 aStackPointer);
 
 	SDL_mutexV(G_callbackMutex);
 }
 
 static void CallbackExec() {
+
+	if (!(reg_flags & FLAG_IF)) {
+		return;
+	}
 
 	SDL_mutexP(G_callbackMutex);
 
@@ -189,7 +201,6 @@ static void CallbackExec() {
 
 	SDL_mutexV(G_callbackMutex);
 	CallbackTask *nextTask = oldTaskList;
-
 	while (nextTask) {
 
 		// do this callback
@@ -205,19 +216,18 @@ static void CallbackExec() {
 		uint16_t old_ds = SegValue(ds);
 		SegSet16(ds, nextTask->getCallbackDataSegment());
 		int old_si = reg_si;
-		reg_si = nextTask->getCallbackDataOffset();
+		reg_si          = nextTask->getCallbackDataOffset();
 		reg_ax     = nextTask->getAX();
 
-		LOG_MSG("CALLBACK_RunRealFar(%x) %x %x:\n", SDL_ThreadID(), SegValue(ss), reg_sp);
+		LOG_MSG("CALLBACK_RunRealFar(%x) %x %x %x:\n", SDL_ThreadID(), SegValue(ss), reg_sp, reg_si);
 		uint16_t old_flags = reg_flags;
 		reg_flags &= ~FLAG_IF;
 		CALLBACK_RunRealFar(callbackSegment, callbackOffset);
-		reg_flags |= old_flags & FLAG_IF;
+		reg_flags = old_flags;
 
 		reg_si = old_si;
 		reg_ax = old_ax;
 		SegSet16(ds, old_ds);
-
 
 		nextTask = nextTask->getNextTask();
 	}
@@ -349,13 +359,15 @@ private:
 	IPaddress m_Address;
 	int m_CallbackDataSegment;
 	int m_CallbackDataOffset;
+	int m_StackPointer;
 
 public:
-	ConnectorParameter(int aHandle, IPaddress& aAddress, int aCallbackDataSegment, int aCallbackDataOffset) {
+	ConnectorParameter(int aHandle, IPaddress& aAddress, int aCallbackDataSegment, int aCallbackDataOffset, int aStackPointer) {
 		m_Handle = aHandle;
 		m_Address = aAddress;
 		m_CallbackDataSegment = aCallbackDataSegment;
 		m_CallbackDataOffset  = aCallbackDataOffset;
+		m_StackPointer        = aStackPointer;
 	}
 
 public:
@@ -371,6 +383,10 @@ public:
 	int getCallbackDataOffset()
 	{
 		return m_CallbackDataOffset;
+	}
+	int getStackPointer()
+	{
+		return m_StackPointer;
 	}
 };
 
@@ -407,7 +423,8 @@ static int ConnectThread(void *paramsPtr)
 	// register callback 
 	CallbackAdd(params->getCallbackDataSegment(),
 	            params->getCallbackDataOffset(),
-				result
+				result,
+	            params->getStackPointer()
 	);
 
 	delete params;
@@ -423,7 +440,7 @@ int NetStartConnector(int handle,IPaddress& ip, int dataSegment, int dataOffset)
 	int threadReturnValue;
 
 	ConnectorParameter *params = new ConnectorParameter(
-	        handle, ip, dataSegment, dataOffset);
+	        handle, ip, dataSegment, dataOffset, reg_sp);
 
 
 	LOG_MSG("\nSimple SDL_CreateThread test:");
@@ -663,7 +680,7 @@ static void NetDisconnect()
 		sock.used = false;
 	}
 
-	CallbackAdd(SegValue(ss), reg_bp, 0);
+	CallbackAdd(SegValue(ss), reg_bp, 0, reg_sp);
 }
 
 
@@ -863,9 +880,31 @@ static void SSLConnect() {
 	struct TLSContext *ctx = reinterpret_cast<struct TLSContext *>(
 	        handles[context - 1]);
 
-	tls_sni_set(ctx, "www.geos-infobase.de");
 
 	int result = SSL_connect(ctx);
+
+	reg_ax = result & 0xFFFF;
+	reg_dx = (result >> 16) & 0xFFFF;
+}
+
+static void SSLSetTLSExtHostName() {
+
+	char host[256];
+	LOG_MSG("!!!SSLConnect");
+
+	int context = reg_si | (reg_bx << 16);
+	LOG_MSG("!!!SSLSetFD %x", context);
+
+	struct TLSContext *ctx = reinterpret_cast<struct TLSContext *>(
+	        handles[context - 1]);
+
+	// TODO check buffer size
+	PhysPt dosBuff = (reg_dx << 4) + reg_cx;
+	MEM_StrCopy(dosBuff, host, reg_di); // 1024 toasts the
+	                                                     // stack
+	host[reg_di] = 0;
+
+	int result = tls_sni_set(ctx, host);
 
 	reg_ax = result & 0xFFFF;
 	reg_dx = (result >> 16) & 0xFFFF;
@@ -1100,9 +1139,15 @@ static Bitu INTB0_Handler(void) {
 		SSLGetSslMethod();
 	} 
 	else if (reg_ax == GHC_SSL_SET_CALLBACK) {
-	
 		SSLSetCallback();
-	} else if ((reg_ax >= GHC_NETWORKING_BASE) && (reg_ax < GHC_NETWORKING_END)) {
+	}
+	else if (reg_ax == GHC_SSL_SET_TLSEXT_HOST_NAME)
+	{
+		SSLSetTLSExtHostName();
+	}
+	else if ((reg_ax >= GHC_NETWORKING_BASE) &&
+		        (reg_ax < GHC_NETWORKING_END))
+	{
 
 
 	}
@@ -1138,6 +1183,9 @@ static Bitu RetrievalCallback_Handler(void) {
 
 static void CALLBACK_Poller(void)
 {
+	if (!(reg_flags & FLAG_IF)) {
+		return;
+	}
 	if (G_receiveCallbackInit && !G_receiveCallActive) {
 
 		SDL_mutexP(G_callbackMutex);
@@ -1185,7 +1233,7 @@ void GeosHost_Init(Section* /*sec*/) {
 	/* Setup the INT B0 vector */
 	call_geoshost = CALLBACK_Allocate();
 	CALLBACK_Setup(call_geoshost, &INTB0_Handler, CB_IRET, "Geoshost");
-	RealSetVec(0xB0, CALLBACK_RealPointer(call_geoshost));
+	RealSetVec(0xA0, CALLBACK_RealPointer(call_geoshost));
 	//__android_log_print(ANDROID_LOG_DEBUG, "GeosHost", "GeosHost_Init");
 	LOG_MSG("Geoshost initialized\n");
 }
