@@ -1217,9 +1217,26 @@ static void CALLBACK_Poller(void)
 	}
 }
 
+const static char G_baseboxID[] = "XOBESAB1";
+static uint8_t G_baseboxIDOffset = 1;
+
+static uint8_t read_baseboxid(io_port_t, io_width_t)
+{
+	uint8_t result  = G_baseboxID[G_baseboxIDOffset];
+	G_baseboxIDOffset++;
+	if (G_baseboxIDOffset > sizeof(G_baseboxID)-1) {
+		result            = 1; // version
+		G_baseboxIDOffset = 0;
+	}
+	return result;
+}
+
+
 void GeosHost_Init(Section* /*sec*/) {
 
 	memset(NetSockets, 0, sizeof(SocketState)*MaxSockets);
+
+	IO_RegisterReadHandler(0x38FF, read_baseboxid, io_width_t::byte);
 
 	G_callbackMutex = SDL_CreateMutex();
 
