@@ -1225,16 +1225,10 @@ void DOSBOX_Init()
 	secprop = control->AddSection_prop("geoshost", &GeosHost_Init, true);
 #endif
 #if C_SLIRP
-<<<<<<< HEAD
 	secprop = control->AddSection_prop("ethernet", &NE2K_Init, changeable_at_runtime);
 
 	pbool = secprop->Add_bool("ne2000", when_idle, true);
 	pbool->Set_help(
-=======
-	secprop = control->AddSection_prop("ethernet", &NE2K_Init, true);
-	Pbool = secprop->Add_bool("ne2000", when_idle,  true);
-	Pbool->Set_help(
->>>>>>> 9ac2de63c (Fix compile/merge issue. #2)
 	        "Enable emulation of a Novell NE2000 network card on a software-based\n"
 	        "network (using libslirp) with properties as follows (enabled by default):\n"
 	        "  - 255.255.255.0:  Subnet mask of the 10.0.2.0 virtual LAN.\n"
