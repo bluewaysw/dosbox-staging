@@ -20,8 +20,8 @@
 
 
 //#include <android/log.h>
-#include "SDL_net.h"
-#include "SDL.h"
+#include <SDL_net.h>
+#include <SDL.h>
 
 extern "C" {
 #include "tlse.h"
