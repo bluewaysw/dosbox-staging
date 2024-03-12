@@ -1295,15 +1295,11 @@ void DOSBOX_Init()
 
 	//	secprop->AddInitFunction(&CREDITS_Init);
 
-<<<<<<< HEAD
 	// VMM interfaces
 	secprop->AddInitFunction(&VIRTUALBOX_Init);
 	secprop->AddInitFunction(&VMWARE_Init);
 
 	//TODO ?
-=======
-	//TODO?
->>>>>>> 297699037 (Update, testing pipeline.)
 	control->AddSection_line("autoexec", &AUTOEXEC_Init);
 	MSG_Add("AUTOEXEC_CONFIGFILE_HELP",
 		"Lines in this section will be run at startup.\n"
