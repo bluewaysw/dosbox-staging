@@ -152,7 +152,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\include;..\src\libs\ghc;..\src\libs\PDCurses;..\src\libs\loguru;..\src\libs\whereami;..\src\platform\visualc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\include;..\src\libs;..\src\libs\ghc;..\src\libs\PDCurses;..\src\libs\loguru;..\src\libs\whereami;..\src\platform\visualc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;TLS_AMALGAMATION;NO_TLS_LEGACY_SUPPORT;NO_TLS_13;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
@@ -196,7 +196,7 @@ IF %ERRORLEVEL% LSS 8 SET ERRORLEVEL = 0</Command>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\include;..\src\libs\ghc;..\src\libs\PDCurses;..\src\libs\loguru;..\src\libs\whereami;..\src\platform\visualc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\include;..\src\libs;..\src\libs\ghc;..\src\libs\PDCurses;..\src\libs\loguru;..\src\libs\whereami;..\src\platform\visualc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions);TLS_AMALGAMATION</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
