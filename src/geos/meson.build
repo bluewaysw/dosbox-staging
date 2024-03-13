@@ -9,6 +9,7 @@ libgeos = static_library(
     include_directories: incdir,
     dependencies: [
         sdl2_dep,
+        sdl2_net_dep,
     ],
 )
 
