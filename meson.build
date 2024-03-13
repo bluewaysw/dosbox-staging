@@ -1259,6 +1259,7 @@ third_party_deps = [
     atomic_dep,
     stdcppfs_dep,
     sdl2_dep,
+    sdl2_net_dep,
     threads_dep,
     ghc_dep,
     libiir_dep,
