@@ -505,7 +505,7 @@ static int ReceiveThread(void* sockPtr)
 		// wait for data buffer to be supplied by dos request, or cancelled
 		if (((SocketState *)sock)->ssl) 
 		{
-			((SocketState *)sock)->receiveDone = true;
+			//((SocketState *)sock)->receiveDone = true;
 			((SocketState *)sock)->sslInitialEnd = true;
 
 			LOG_MSG("\nSSL initial receive done %x", sock);
