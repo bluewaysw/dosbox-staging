@@ -352,6 +352,7 @@ static void NetAllocConnection() {
 }
 
 
+
 class ConnectorParameter {
 	
 private:
@@ -523,7 +524,12 @@ static int ReceiveThread(void* sockPtr)
 				sock->recvBuf = new char[8192];
 			}
 
-			int result = SDLNet_TCP_Recv(((SocketState*)sock)->socket, sock->recvBuf, 8192);
+			int result = -1;
+			if (!sock->done){
+				result = SDLNet_TCP_Recv(((SocketState*)sock)->socket,
+				                   sock->recvBuf,
+				                   8192);
+			}
 			LOG_MSG("\nReceived data %d", result);
 			if ((!sock->done) && (result > 0)) {
 
@@ -541,7 +547,7 @@ static int ReceiveThread(void* sockPtr)
 
 				// handle receive error
 				LOG_MSG("\nReceived done");
-				SDL_Delay(5000);
+				//SDL_Delay(5000);
 				((SocketState*)sock)->receiveDone = true;
 				((SocketState *)sock)->sslInitialEnd = true;
 				return 0;
@@ -665,12 +671,14 @@ static void NetClose() {
 	if (sock.used) {
 
 		sock.done = true;
-		//SDLNet_TCP_Close(sock.socket);
+		SDLNet_TCP_Close(sock.socket);
+		sock.used = false;
 	}
 }
 
 static void NetDisconnect()
 {
+	// actually close
 	LOG_MSG("NetDisconnect: %d %x %x", reg_bx, SegValue(ss), reg_bp);
 	SocketState &sock = NetSockets[reg_bx];
 
@@ -693,8 +701,8 @@ static void NetRecvNextClosed() {
 			if (!NetSockets[i].done) {
 				if (NetSockets[i].receiveDone) {
 
-					NetSockets[i].receiveDone = false;
-					reg_cx = i;
+					NetSockets[i].done = true;
+					reg_cx                    = i;
 					if (reg_cx > 0) {
 						LOG_MSG("NetRecvNextClosed: %d", reg_cx);
 					}
